@@ -1,106 +1,95 @@
 package com.sda.java.training.backend.service;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.LinkedList;
 import java.util.List;
 
 import javax.annotation.PostConstruct;
+import javax.persistence.NoResultException;
 
+import org.apache.logging.log4j.util.Strings;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
+import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.registry.StandardServiceRegistry;
+import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+import org.hibernate.query.Query;
 import org.springframework.stereotype.Service;
+
+import com.sda.java.training.backend.controller.BadRequestException;
+import com.sda.java.training.backend.model.Produkt;
 
 @Service
 public class ProduktService implements IProduktService{
 
+
+  private SessionFactory sessionFactory;
+  private Session session;
+
   @PostConstruct
-  public void initDriver() {
+  public void initSessionFactory() {
+    final StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
+        .configure() // configures settings from hibernate.cfg.xml
+        .build();
     try {
-      Class.forName("com.mysql.cj.jdbc.Driver");
-      Connection con = DriverManager.getConnection(
-          "jdbc:mysql://localhost:3306/sda", "root", "hUfKTHTjC2X99s4GTFEgUeVy");
-    } catch (Exception e) {
-      System.out.println("Nepodarilo se vytvorit spojeni do databaze");
-      throw new RuntimeException(e);
+      sessionFactory = new MetadataSources(registry).buildMetadata().buildSessionFactory();
+      session = sessionFactory.openSession();
+    } catch (Exception ex) {
+      StandardServiceRegistryBuilder.destroy(registry);
     }
   }
 
   @Override
   public List<Produkt> findAll() {
-    LinkedList<Produkt> result = new LinkedList<Produkt>();
-    try {
-      Connection con = getConnection();
-      Statement stmt = con.createStatement();
-      ResultSet rs = stmt.executeQuery("select * from produkt");
-      while (rs.next()) {
-        result.add(new Produkt(rs.getInt("id"), rs.getString("nazev"), rs.getString("popis")));
-      }
-      con.close();
-    } catch (SQLException e) {
-      System.out.println("Chyba v programu, chybny SQL prikaz");
-      throw new RuntimeException(e);
-    }
-    return result;
+    return session.createQuery("select p from Produkt p WHERE p.stav = 'aktivni'", Produkt.class).getResultList();
   }
 
   @Override
   public Produkt getById(Long id) {
     try {
-      Connection con = getConnection();
-      PreparedStatement stmt = con.prepareStatement("select * from produkt WHERE id = ?");
-      stmt.setLong(1,id);
-      ResultSet rs = stmt.executeQuery();
-      Produkt result = null;
-      if (rs.next()) {
-         result = new Produkt(rs.getInt("id"), rs.getString("nazev"), rs.getString("popis"));
-      }
-      con.close();
-      return result;
-    } catch (SQLException e) {
-      System.out.println("Chyba v programu, chybny SQL prikaz");
-      throw new RuntimeException(e);
+      Query<Produkt> query = session.createQuery("select p from Produkt p WHERE p.id = :id", Produkt.class);
+      query.setParameter("id", id);
+      return query.getSingleResult();
+    } catch (NoResultException e) {
+      return null;
     }
   }
 
   @Override
   public Produkt create(Produkt produkt) {
-    try {
-      Connection con = getConnection();
-      PreparedStatement stmt = con.prepareStatement("INSERT INTO produkt (nazev, popis) VALUES (?, ?)");
-      stmt.setString(1,produkt.getNazev());
-      stmt.setString(2,produkt.getPopis());
-      stmt.executeUpdate();
-      ResultSet rs = stmt.executeQuery("SELECT LAST_INSERT_ID();");
-      Integer id = null;
-      if (rs.next()) {
-        id = rs.getInt(1);
-      }
-      Produkt result = getById(id.longValue());
-      con.close();
-      return result;
-    } catch (SQLException e) {
-      System.out.println("Chyba v programu, chybny SQL prikaz");
-      throw new RuntimeException(e);
+    Transaction transaction = getTransaction();
+    if (Strings.isBlank(produkt.getNazev())) {
+      throw new BadRequestException();
     }
+    produkt.setStav(Produkt.AKTIVNI);
+    session.persist(produkt);
+    transaction.commit();
+    return produkt;
   }
 
   @Override
-  public void update(Produkt resource) {
-
+  public Produkt update(Long id, Produkt produkt) {
+    Transaction transaction = getTransaction();
+    Produkt oldProdukt = getById(id);
+    if (Strings.isNotBlank(produkt.getNazev())) {
+      oldProdukt.setNazev(produkt.getNazev());
+    }
+    if (Strings.isNotBlank(produkt.getPopis())) {
+      oldProdukt.setPopis(produkt.getPopis());
+    }
+    transaction.commit();
+    return oldProdukt;
   }
 
   @Override
   public void deleteById(Long id) {
-
+    Transaction transaction = getTransaction();
+    session.delete(getById(id));
+    transaction.commit();
   }
 
-  private Connection getConnection() {
+  private Transaction getTransaction() {
     try {
-      return DriverManager.getConnection(
-          "jdbc:mysql://localhost:3306/sda", "root", "heslo");
+      return session.beginTransaction();
     } catch (Exception e) {
       System.out.println("Nepodarilo se vytvorit spojeni do databaze");
       throw new RuntimeException(e);

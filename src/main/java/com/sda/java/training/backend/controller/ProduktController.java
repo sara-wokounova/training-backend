@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sda.java.training.backend.model.Produkt;
 import com.sda.java.training.backend.service.IProduktService;
-import com.sda.java.training.backend.service.Produkt;
 
 @RestController
 @RequestMapping("/produkt")
@@ -43,10 +43,10 @@ public class ProduktController {
 
     @PutMapping(value = "/{id}")
     @ResponseStatus(HttpStatus.OK)
-    public void update(@PathVariable( "id" ) Long id, @RequestBody Produkt resource) {
+    public Produkt update(@PathVariable( "id" ) Long id, @RequestBody Produkt resource) {
       RestPreconditions.checkNotNull(resource);
-      RestPreconditions.checkNotNull(service.getById(new Long(resource.getId())));
-      service.update(resource);
+      RestPreconditions.checkNotNull(service.getById(id));
+      return service.update(id, resource);
     }
 
     @DeleteMapping(value = "/{id}")
