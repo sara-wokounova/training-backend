@@ -12,6 +12,10 @@
     <property name="show_sql">true</property>
 
     <mapping class="com.sda.java.training.backend.model.Produkt" />
+    <mapping class="com.sda.java.training.backend.model.Zakaznik" />
+    <mapping class="com.sda.java.training.backend.model.Objednavka" />
+    <mapping class="com.sda.java.training.backend.model.PolozkaObjednavky" />
+    <mapping class="com.sda.java.training.backend.model.PolozkaCeniku" />
 
   </session-factory>
 </hibernate-configuration>
